@@ -10,7 +10,7 @@
 
 从系统实现角度看，解耦架构还具有良好的可扩展性。对于纯遥操作场景，上肢接口可直接接收第 2 章重定向模块输出；对于自主任务场景，上肢接口也可无缝接收由视觉感知和高层规划器生成的末端目标。下肢控制器则可以在不同任务之间共享同一套基础移动能力，从而避免在每个任务中重复训练整套全身策略。解耦式通用全身运动控制架构如图~\ref{fig:decoupled_framework} 所示。
 
-\begin{figure}[htbp]
+\begin{figure}[H]
     \centering
     \begin{tikzpicture}[
         % 定义全局样式
@@ -85,11 +85,48 @@
 
 \subsection{基于 PICO 的双臂目标位姿获取}
 
-本文采用 PICO 作为上肢遥操作输入设备。系统通过 TeleVuer 接口读取操作者双手和双臂的运动状态，并将其转换为适用于机器人控制的左右臂目标位姿表示。与直接映射人体关节角的方案不同，本文采用基于末端位姿的遥操作方式，即将操作者左右腕部在空间中的位置与姿态统一表示为齐次变换矩阵，并将其作为双臂逆运动学模块的输入。
+本文采用 PICO 作为上肢遥操作输入设备，基于 \texttt{Vuer} 框架构建了底层的双向数据通信与位姿获取模块。为了保证机器人控制主循环的高频实时性，并有效处理跨系统的坐标系差异，本模块在工程实现上重点解决了网络通信、并发数据同步以及跨域坐标系转换三个核心问题。
 
-这种表示方式具有两方面优势。首先，末端位姿描述与具体机器人关节结构解耦，因而更适合不同机器人平台之间的迁移；其次，末端位姿能够更直接反映抓取、递送、挥拍等操作任务中的空间目标，有利于在遥操作模式与自主规划模式之间共享同一套上肢控制接口。因此，在本文的系统设计中，无论目标位姿来自 PICO 遥操作输入还是来自后续任务规划模块，均可统一交由同一套双臂逆运动学模块处理。
+在网络通信方面，系统在底层以独立进程启动 XR 服务端。PICO 设备作为客户端，通过无线网络与服务端建立 WebSocket 连接，将高频的头部相机位姿、手柄控制器状态以及手部追踪数据，以事件流的形式（如 \texttt{CONTROLLER\_MOVE} 或 \texttt{HAND\_MOVE}）异步发送至服务端。服务端接收到这些事件后，利用回调机制实时解析操作者的多维度动作指令。
 
-此外，遥操作系统还支持图像回传与数据记录功能。机器人头部与腕部相机图像可以回传至 XR 设备，为操作者提供视觉反馈；同时，系统可同步记录图像、左右臂状态和控制输出，用于后续数据集构建、离线分析和算法调试。这为上肢遥操作从单纯控制接口扩展到数据采集平台提供了基础。
+在多进程并发与共享内存同步方面，由于网络 I/O 存在不可避免的波动和延迟，若将其与机器人控制循环耦合，极易导致控制频率不稳定。为此，本文将 XR 服务端放置在独立的后台进程中运行。服务端在解析出目标位姿矩阵与按键状态后，将其写入带有进程锁的共享内存区域（如 \texttt{multiprocessing.Array} 和 \texttt{Value}）；主控制进程则在每个控制周期直接从共享内存中以非阻塞的方式读取最新数据，从而实现了遥操作输入与底层控制频率的有效解耦。
+
+在跨系统坐标系映射与基座平移方面，由于 PICO 采集的原始空间数据遵循 OpenXR 规范（以 Y 轴朝上为标准），而机器人本体运动学模型遵循标准 URDF 规范（以 Z 轴朝上为标准），两者无法直接混用。系统的 \texttt{TeleVuerWrapper} 接口模块负责执行基础的坐标系映射矩阵乘法，完成空间基底与初始姿态的对齐。此外，XR 空间的原点通常与操作者的头部相机初始位置绑定，而双臂逆运动学求解以机器人的腰部（Waist）关节为基座坐标系。因此，该模块还会基于机器人尺寸参数自动完成从头部到腰部的空间平移补偿，最终将标准化、基于腰部基座的齐次变换矩阵作为双臂目标位姿提交给逆运动学求解器。
+
+这种基于统一末端位姿的遥操作架构具有两方面优势：首先，位姿描述与具体机器人关节结构解耦，更适合多平台迁移；其次，它在格式上与自主任务规划模块生成的空间目标完全一致，实现了人工操作与自主规划在控制接口层面的无缝共享。此外，机器人头部相机图像也可通过该网络链路实时回传至 XR 设备，为操作者提供第一视角的闭环视觉反馈。PICO 遥操作输入与主程序通信的整体数据流如图~\ref{fig:pico_teleop_flow} 所示。
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        font=\small\sffamily,
+        >=Stealth,
+        node distance=1.2cm,
+        process/.style={rectangle, draw=blue!70!black, fill=blue!5, thick, minimum width=4cm, minimum height=1cm, align=center, rounded corners=3pt},
+        database/.style={cylinder, draw=orange!70!black, fill=orange!5, thick, minimum width=4cm, minimum height=1.2cm, align=center, shape border rotate=90, aspect=0.25},
+        cloud/.style={ellipse, draw=green!70!black, fill=green!5, thick, minimum width=4cm, minimum height=1cm, align=center},
+        arrow/.style={->, thick, draw=black!80}
+    ]
+
+    % Nodes
+    \node[cloud] (pico) {\textbf{PICO VR 设备} \\ \footnotesize (头部/手柄/手部追踪)};
+    \node[process, below=of pico] (vuer) {\textbf{XR 服务端独立进程} \\ \footnotesize (Vuer 异步接收 WebSocket 事件)};
+    \node[database, below=of vuer] (shm) {\textbf{加锁共享内存} \\ \footnotesize (multiprocessing.Array/Value)};
+    \node[process, below=of shm] (wrapper) {\textbf{主控制循环读取与映射} \\ \footnotesize (TeleVuerWrapper 坐标系转换)};
+    \node[process, below=of wrapper] (ik) {\textbf{双臂逆运动学求解器} \\ \footnotesize (CasADi + IPOPT)};
+
+    % Arrows
+    \draw[arrow] (pico) -- (vuer) node[midway, right] {\footnotesize 事件流 (如 \texttt{HAND\_MOVE})};
+    \draw[arrow] (vuer) -- (shm) node[midway, right] {\footnotesize 实时解析并写入};
+    \draw[arrow] (shm) -- (wrapper) node[midway, right] {\footnotesize 高频非阻塞读取};
+    \draw[arrow] (wrapper) -- (ik) node[midway, right] {\footnotesize 标准化齐次变换矩阵};
+
+    % Optional bounding box for the wrapper
+    \node[draw=black!30, dashed, inner sep=0.3cm, fit=(wrapper), label={[text=black!60]left:基座平移与姿态对齐}] {};
+
+    \end{tikzpicture}
+    \caption{PICO 遥操作输入与位姿获取通信数据流图}
+    \label{fig:pico_teleop_flow}
+\end{figure}
 
 \subsection{双臂逆运动学求解方法}
 

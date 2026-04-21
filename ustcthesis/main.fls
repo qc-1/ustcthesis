@@ -171,6 +171,8 @@ INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/tools/xspace.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/tools/xspace.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/relsize/relsize.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/relsize/relsize.sty
+INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/float/float.sty
+INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/float/float.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty
 INPUT /usr/local/texlive/2026/texmf-dist/tex/latex/pgf/basiclayer/pgf.sty
