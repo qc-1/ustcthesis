@@ -1,4 +1,6 @@
 \contentsline {table}{\numberline {2.1}{\ignorespaces 机器人--物体交互数据采集中的代表性文件与关键字段}}{10}{table.2.1}%
-\contentsline {table}{\numberline {A.1}{\ignorespaces Unitree G1 平台关键参数占位表}}{29}{table.caption.16}%
-\contentsline {table}{\numberline {B.1}{\ignorespaces PPO 训练超参数占位表}}{30}{table.caption.17}%
+\contentsline {table}{\numberline {A.1}{\ignorespaces Unitree G1 平台关键参数占位表}}{32}{table.caption.17}%
+\contentsline {table}{\numberline {B.1}{\ignorespaces PPO 训练超参数配置表}}{33}{table.caption.18}%
+\contentsline {table}{\numberline {B.2}{\ignorespaces 网络结构与训练环境配置表}}{34}{table.caption.19}%
+\contentsline {table}{\numberline {B.3}{\ignorespaces 奖励、观测噪声与终止条件参数表}}{35}{table.caption.20}%
 \contentsfinish 

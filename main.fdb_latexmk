@@ -1,0 +1,19 @@
+# Fdb version 4
+["xdvipdfmx"] 0 "main.xdv" "main.pdf" "main" 0 -1
+  "main.xdv" 0 -1 0 "xelatex"
+  (generated)
+  "main.pdf"
+  (rewritten before read)
+["xelatex"] 1777277949.42246 "/home/qc/ustcthesis/ustcthesis/main.tex" "main.xdv" "main" 1777277949.58122 2
+  "/home/qc/ustcthesis/ustcthesis/main.tex" 1776161005.01078 1086 2b48f6014887b4f9c0ffbb028a0c48a1 ""
+  "/usr/local/texlive/2026/texmf-dist/web2c/texmf.cnf" 1770478701 43630 e9fa012910491fe5ae08a72c3c2997a7 ""
+  "/usr/local/texlive/2026/texmf-var/web2c/xetex/xelatex.fmt" 1775813220 5948578 3e435543381f4af5714e4e2c5f4bd502 ""
+  "/usr/local/texlive/2026/texmf.cnf" 1775813179.03624 455 5b996dcaa0eb4ef14a83b026bc0a008c ""
+  "main.aux" 1777276631.83106 32 3985256e7290058c681f74d7a3565a19 "xelatex"
+  "ustcthesis.cls" 0 -1 0 ""
+  "ustcthesis/main.tex" 1776161005.01078 1086 2b48f6014887b4f9c0ffbb028a0c48a1 ""
+  (generated)
+  "main.aux"
+  "main.log"
+  "main.xdv"
+  (rewritten before read)

@@ -172,31 +172,180 @@ J = w_p \lVert e_p \rVert^2 + w_r \lVert e_r \rVert^2 + w_q \lVert q \rVert^2 + 
 
 \section{下肢强化学习 Locomotion 策略}
 
-\subsection{策略训练环境配置}
 
-下肢控制策略在 Isaac Gym 或 Isaac Lab 等大规模并行仿真环境中进行训练。仿真环境负责提供机器人动力学求解、接触模拟、地形变化以及外部扰动注入等功能，以支撑高频率的并行策略优化。训练过程中，机器人从不同初始姿态、速度指令和环境参数出发，不断学习如何维持平衡并实现期望移动行为。
+为使人形机器人在执行全身任务时具备稳定、可切换且可复用的基础移动能力，本文将下肢控制建模为基于强化学习的参考动作跟踪问题，并在 BeyondMimic 框架基础上完成训练与部署。与传统仅跟踪质心速度或足端接触相位的 locomotion 方法不同，本文更强调在保留自然步态结构的前提下，学习机器人对基座速度扰动、姿态偏差和接触变化的鲁棒响应。需要指出的是，本文在工程实现上并未训练单一全向移动策略，而是分别训练前进、后退、左移、右移和原地旋转五个基础策略，并通过 PICO 手柄输入完成在线切换，从而构成可用于全身控制系统的下肢技能库。
 
-为了提升策略在真实系统中的适应能力，本文在训练环境中引入域随机化机制，对摩擦系数、机身质量分布、执行器参数、传感噪声和地形高度扰动等因素进行随机采样。这样可以使策略在训练阶段接触更广泛的动力学条件，降低部署到真实机器人时因建模误差带来的性能退化风险。对于复杂地形或外部碰撞情形，也可通过额外扰动课程逐步增加训练难度。
 
-\subsection{状态空间与奖励设计}
+\subsection{任务建模与训练环境}
 
-状态空间设计直接影响强化学习策略能否充分利用机器人本体信息并形成稳定步态。本文在下肢策略中使用的观测包括 IMU 姿态、机身角速度、各下肢关节角与关节速度、历史速度命令、足端接触信息以及必要的短时历史状态。通过这些输入，策略能够同时感知机器人当前姿态、运动趋势和外部支撑状态，从而做出合理动作决策。
+本文将下肢参考动作跟踪任务建模为马尔可夫决策过程
+\begin{equation}
+\mathcal{M} = (\mathcal{S}, \mathcal{O}, \mathcal{A}, \mathcal{P}, r, \gamma),
+\end{equation}
+其中，$\mathcal{S}$ 表示机器人与仿真环境的真实状态空间，$\mathcal{O}$ 表示策略可观测空间，$\mathcal{A}$ 表示动作空间，$\mathcal{P}$ 表示环境状态转移，$r$ 为阶段奖励函数，$\gamma$ 为折扣因子。策略训练的目标是学习参数化策略 $\pi_{\theta}$，使其在参考动作驱动下最大化折扣累计回报：
+\begin{equation}
+\max_{\theta} J(\pi_{\theta}) = \mathbb{E}_{\pi_{\theta}}\left[\sum_{t=0}^{T}\gamma^t r_t\right].
+\end{equation}
+在这里，机器人并不是从零开始学习抽象的“行走能力”，而是在参考运动序列的引导下学习如何对扰动和误差进行补偿，从而获得更稳定、更自然的步态跟踪能力。
 
-动作空间采用下肢关节位置目标或位置增量的形式表示，覆盖左右腿共 12 个关键关节。相较于直接输出力矩控制指令，位置目标形式更便于与现有伺服执行接口兼容，也有助于提升训练稳定性。底层执行器再结合 PD 控制器或平台已有的关节控制模块完成实际跟踪。
+从训练环境组织方式看，本文采用 Isaac Lab 的 manager-based 强化学习框架来承载这一 MDP。
+环境以平地为基础场景，通过并行仿真同时采样大量机器人实例，并在重置阶段注入根部位置、姿态、速度、接触和动力学参数扰动。
+训练对象为 Unitree G1 的全身模型，下肢承担主要 locomotion 功能，
+隐式 PD 执行器负责将策略输出的关节参考量转换为底层稳定驱动。
+具体的 PPO 超参数、并行环境规模、仿真时间步长、执行器参数以及动作缩放配置不再在此展开，
+统一整理于附录表~\ref{tab:ppo-hparams} 与表~\ref{tab:rl-env-config}。
 
-奖励函数由多个子项组成，包括速度跟踪奖励、姿态稳定奖励、足端接触一致性奖励以及能量消耗惩罚等。其中，速度跟踪项鼓励策略准确跟随前进、后退、旋转和横向移动指令；平衡稳定项用于抑制过大的机身姿态偏差和跌倒；能量效率项则用于减少无效摆动和过大关节动作，以提升策略在真机上的可执行性。通过对不同奖励项进行加权组合，策略能够在稳定性与机动性之间取得平衡。
+为更清晰展示该策略的训练逻辑，本文将 BeyondMimic 下肢策略的训练流程概括为“参考动作采样--环境扰动--观测构造--PPO 优化--奖励回传”的闭环结构，如图~\ref{fig:locomotion_training_pipeline} 所示。
 
-\subsection{网络结构与训练过程}
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        font=\small\sffamily,
+        >=Stealth,
+        node distance=1.0cm and 1.2cm,
+        box/.style={draw, rounded corners=3pt, thick, align=center, minimum width=3.2cm, minimum height=1.1cm},
+        data/.style={box, fill=gray!10, draw=gray!70},
+        env/.style={box, fill=blue!5, draw=blue!70!black},
+        rl/.style={box, fill=orange!8, draw=orange!70!black},
+        reward/.style={box, fill=green!8, draw=green!60!black},
+        arrow/.style={->, thick, draw=black!80},
+        dashedarrow/.style={->, thick, dashed, draw=purple!80!black}
+    ]
 
-本文下肢策略采用基于 PPO 的强化学习算法进行训练。策略网络和价值网络均使用多层感知机结构，通过若干隐藏层对输入状态进行非线性特征提取，并输出各关节动作分布参数。PPO 算法在策略更新时具有较好的稳定性和实现成熟度，因此适合作为基础 locomotion 技能训练的核心优化方法。
+    \node[data] (motion) {参考动作数据集\\ \footnotesize motion clips};
+    \node[env, right=of motion] (command) {参考动作采样与扰动\\ \footnotesize 根部位姿/速度随机化};
+    \node[env, right=of command] (sim) {Isaac Lab 并行环境\\ \footnotesize 物理仿真 + 执行器模型};
 
-在训练流程中，系统首先从较简单的速度命令和稳定站立任务开始，待策略具备基本平衡能力后，再逐步增加方向切换、复合速度命令和外部扰动。通过课程式训练，策略能够逐渐适应更复杂的控制目标。对于学习率、批次大小、折扣因子和裁剪系数等超参数，本文暂在附录中以占位方式保留，后续将结合最终实验配置补全。
+    \node[rl, below=1.4cm of command] (obs) {观测构造\\ \footnotesize policy / critic observations};
+    \node[rl, right=of obs] (ppo) {PPO 策略优化器\\ \footnotesize Actor-Critic + RSL-RL};
+    \node[reward, right=of ppo] (rew) {奖励与终止判定\\ \footnotesize tracking / penalty / reset};
 
-\subsection{策略性能评估}
+    \draw[arrow] (motion) -- (command);
+    \draw[arrow] (command) -- (sim);
+    \draw[arrow] (sim) -- (rew);
+    \draw[arrow] (sim) -- (obs);
+    \draw[arrow] (obs) -- (ppo);
+    \draw[arrow] (rew) -- (ppo);
+    \draw[dashedarrow] (ppo.north) |- (sim.south) node[pos=0.72, right] {动作输出};
+    \draw[dashedarrow] (rew.west) -- ++(-1.0,0) |- (command.south) node[pos=0.2, below] {难例重采样/重置};
 
-为了评价下肢 locomotion 策略的实用性，本文从速度覆盖范围、任务成功率和鲁棒性测试三方面进行分析。速度覆盖范围反映策略在不同方向上的可控运动区间；任务成功率用于统计在规定时间或路径约束下完成动作的比例；鲁棒性测试则关注策略在地形变化、外力扰动和指令切换条件下的稳定性。
+    \node[draw=black!25, dashed, inner sep=0.35cm, fit=(command)(sim)(obs)(ppo)(rew),
+      label={[text=black!60]above:下肢强化学习训练闭环}] {};
+    \end{tikzpicture}
+    \caption{下肢 Locomotion 策略训练流程图}
+    \label{fig:locomotion_training_pipeline}
+\end{figure}
 
-结合当前提纲，本文重点关注前进、后退、原地旋转和左右平移四类基础运动模式。由于真机和仿真统计结果尚待整理，本节暂保留量化指标占位，如最大前进速度为 X\,m/s、旋转角速度为 X\,rad/s、任务成功率为 XX\% 等。后续补充正式实验结果后，可进一步将这些指标整理为统一表格，并与不同训练设置下的策略表现进行对比。
+
+\subsection{命令空间、观测空间与动作空间设计}
+
+在命令空间设计上，本文并不是直接向策略输入一个低维速度指令，而是通过 \texttt{MotionCommand} 模块从参考动作数据集中读取某一时刻的关节状态与关键刚体运动信息，并将其记为参考命令 $c_t$。在具体实现中，参考命令由关节位置、关节速度以及锚点和关键刚体的位姿与速度信息组成。为增强策略对时序变化和扰动的适应能力，训练阶段会在参考动作采样后进一步叠加根部位姿与速度随机化，使策略学习的不是对单一轨迹的机械记忆，而是围绕参考动作进行稳定补偿的能力。
+
+对 actor 而言，本文将策略观测写为
+\begin{equation}
+o_t = \left[c_t,\ e^{\text{anchor}}_t,\ v^{\text{base}}_t,\ \omega^{\text{base}}_t,\ q_t-q_0,\ \dot{q}_t,\ a_{t-1}\right],
+\end{equation}
+其中，$e^{\text{anchor}}_t$ 表示参考锚点相对机器人基座的位姿误差，$v^{\text{base}}_t$ 与 $\omega^{\text{base}}_t$ 分别表示机身线速度和角速度，$q_t-q_0$ 为相对默认姿态的关节偏移，$a_{t-1}$ 为上一时刻动作。该观测设计使策略在每个时刻同时感知参考目标、当前机身运动状态和历史控制趋势。为提升 sim-to-real 鲁棒性，训练过程中还在这些观测量上叠加均匀噪声，其具体范围统一列于附录表~\ref{tab:rl-reward-noise-termination}。
+
+对于 critic，本文采用非对称 actor-critic 结构，在训练阶段向值函数网络额外提供关键刚体相对锚点的真实位置与姿态等特权信息，从而得到更稳定的值函数估计。记 critic 输入为
+\begin{equation}
+\tilde{o}_t = \left[o_t,\ p^{\text{body}}_t,\ R^{\text{body}}_t\right].
+\end{equation}
+这一设计兼顾了部署阶段的部分可观测约束与训练阶段的估计精度需求。
+
+动作空间方面，策略输出被定义为
+\begin{equation}
+a_t = \pi_{\theta}(o_t),
+\end{equation}
+并进一步映射为关节位置参考量
+\begin{equation}
+q_t^{\text{sp}} = q_0 + \alpha \odot a_t,
+\end{equation}
+其中，$\alpha$ 为按执行器能力设置的关节缩放系数。也就是说，策略并不直接输出力矩，而是生成目标关节位置增量，再由底层隐式 PD 执行层完成力矩闭环。这样既降低了策略直接学习复杂接触动力学逆模型的难度，又保留了执行器侧的稳定性与物理约束。
+
+
+\subsection{奖励函数与终止条件设计}
+
+奖励函数设计是本文下肢 motion tracking 训练的核心。设机器人躯干为锚点刚体 $a$，关键刚体集合为 $\mathcal{B}$，则相对位置、姿态、线速度和角速度误差可分别写为
+\begin{equation}
+\bar{e}_{p} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}}
+\left\| \left(p_{i,t}^{\text{ref}} - p_{a,t}^{\text{ref}}\right) - \left(p_{i,t} - p_{a,t}\right) \right\|_2^2,
+\end{equation}
+\begin{equation}
+\bar{e}_{R} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} d\!\left(R_{i,t}^{\text{ref}}, R_{i,t}\right)^2,
+\end{equation}
+\begin{equation}
+\bar{e}_{v} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} \left\| v_{i,t}^{\text{ref}} - v_{i,t} \right\|_2^2,\qquad
+\bar{e}_{\omega} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} \left\| \omega_{i,t}^{\text{ref}} - \omega_{i,t} \right\|_2^2,
+\end{equation}
+其中，$d(\cdot,\cdot)$ 表示姿态距离。与 BeyondMimic 中的实现一致，本文使用指数型奖励塑形将误差映射为有界正奖励：
+\begin{equation}
+r_s = \exp\!\left(-\frac{\bar{e}_s}{\sigma_s^2}\right), \qquad s\in\{p,R,v,\omega\}.
+\end{equation}
+除关键刚体的相对误差外，本文还对锚点在世界坐标系下的位置和姿态误差设置全局跟踪项，以约束机身整体的稳定性和方向一致性。
+
+综合各项正向奖励与正则项后，阶段奖励可写为
+\begin{equation}
+\begin{aligned}
+r_t =\;& w_{a,p} r_{a,p} + w_{a,R} r_{a,R} + w_p r_p + w_R r_R + w_v r_v + w_{\omega} r_{\omega} \\
+&- \lambda_u \left\| a_t - a_{t-1} \right\|_2^2 - \lambda_l r_{\text{limit}} - \lambda_c r_{\text{contact}},
+\end{aligned}
+\end{equation}
+其中，$r_{a,p}$ 和 $r_{a,R}$ 分别表示锚点位置与姿态跟踪奖励，$r_{\text{limit}}$ 表示关节越限惩罚，$r_{\text{contact}}$ 表示非期望接触惩罚。上述设计对应了“全局姿态--局部结构--动态一致性--物理可行性”的四层训练目标。各奖励项的具体权重、$\sigma$ 参数及接触阈值整理于附录表~\ref{tab:rl-reward-noise-termination}。
+
+终止条件同样围绕跟踪失效和机身失稳进行设计。若锚点高度偏差、锚点姿态偏差或关键末端刚体高度偏差超过阈值，则提前结束当前回合。其逻辑可概括为
+\begin{equation}
+d_t = \mathbb{I}\!\left(
+\left| z_{a,t}^{\text{ref}} - z_{a,t} \right| > \delta_z
+\;\vee\;
+d\!\left(R_{a,t}^{\text{ref}}, R_{a,t}\right) > \delta_R
+\;\vee\;
+\max_{j\in\mathcal{E}} \left| z_{j,t}^{\text{ref}} - z_{j,t} \right| > \delta_e
+\right),
+\end{equation}
+其中，$\mathcal{E}$ 表示踝部和腕部等关键末端集合。这样的提前终止机制能够避免策略在严重跌倒状态中浪费采样步数，并将训练重点集中到可恢复、可学习的误差区域。
+
+此外，为提高困难样本利用效率，本文保留了 motion bin 的自适应采样机制。系统根据最近训练中各时间片段的失败频率调整重置时的采样概率，使策略在保持均匀覆盖的同时，更关注转身、侧移等高难度动作区间。
+
+
+\subsection{策略优化与训练配置}
+
+在策略优化算法上，本文采用 PPO 对策略网络和价值网络进行联合训练。其核心裁剪目标可写为
+\begin{equation}
+L^{\text{clip}}(\theta) =
+\mathbb{E}_t\left[
+\min\!\left(
+\rho_t(\theta)\hat{A}_t,\ 
+\text{clip}\!\left(\rho_t(\theta), 1-\epsilon, 1+\epsilon\right)\hat{A}_t
+\right)
+\right],
+\end{equation}
+其中，
+\begin{equation}
+\rho_t(\theta) = \frac{\pi_{\theta}(a_t|o_t)}{\pi_{\theta_{\text{old}}}(a_t|o_t)},
+\end{equation}
+$\hat{A}_t$ 为优势估计。训练时，PPO 还联合价值函数损失和熵正则项进行更新，从而在策略改进、值函数拟合和探索能力之间取得平衡。由于本文采用非对称 actor-critic 结构，actor 仅依赖可部署观测，而 critic 在训练阶段使用特权观测，这种设置能够在不增加部署复杂度的前提下提高训练稳定性。
+
+从正文写作角度看，PPO 的学习率、批大小、epoch 数、clip 系数、熵正则、KL 约束，以及并行环境数、控制周期、网络层数等具体配置均属于可复现参数，而非本章方法学核心，因此统一整理在附录表~\ref{tab:ppo-hparams} 和表~\ref{tab:rl-env-config} 中。这样既能保持正文对建模与优化逻辑的突出，也便于后续实验复现。
+
+\subsection{多策略集成与 PICO 手柄切换}
+
+除单个策略的训练外，本文在系统部署层面进一步采用了“多策略技能库”的思路，而不是将所有移动模式压缩为单一全向策略。具体而言，本文基于 BeyondMimic 分别训练了五个基础下肢策略，记为
+\begin{equation}
+\Pi = \left\{ \pi_{\mathrm{fwd}},\ \pi_{\mathrm{bwd}},\ \pi_{\mathrm{left}},\ \pi_{\mathrm{right}},\ \pi_{\mathrm{yaw}} \right\},
+\end{equation}
+分别对应前进行走、后退行走、左向平移、右向平移和原地旋转五类基础 locomotion 模式。
+
+采用多策略而非单一统一策略的主要原因在于：不同移动模式对应的参考动作分布、支撑相位切换和机身姿态调节规律存在明显差异，若将其全部纳入单一策略，动作分布会显著增宽，训练收敛和部署稳定性都会受到影响。将基础移动能力拆分为多个专用策略后，每个策略都可以在更聚焦的命令空间内完成训练，从而提高各模式下的稳定性、动作质量和可控性。
+
+在在线执行阶段，PICO 手柄输入不再直接映射为连续全向速度，而是作为高层模式切换信号。设手柄输入为 $u_t$，模式选择器为 $\mathcal{S}(\cdot)$，则在线控制逻辑可写为
+\begin{equation}
+m_t = \mathcal{S}(u_t), \qquad a_t = \pi_{m_t}(o_t),
+\end{equation}
+其中，$m_t$ 表示当前选中的 locomotion 模式，$\pi_{m_t}$ 表示与该模式对应的策略网络。也就是说，PICO 手柄承担的是高层意图选择功能，而具体的下肢动作生成仍由当前被选中的强化学习策略完成。通过这种方式，本文实现了基于手柄输入的前进、后退、横移和原地转向切换，使下肢系统能够在遥操作任务中提供可预测、可复用且易于上层调用的基础机动能力。
+
+综合来看，本文的下肢 locomotion 模块并不是单纯以“速度跟踪”为目标的传统行走控制器，而是一个融合参考动作跟踪、域随机化、自适应采样、PPO 优化以及多策略在线切换的基础运动控制体系。它在体系结构上与上肢遥操作模块天然解耦：下肢负责生成稳定的全身支撑与基座移动能力，上肢则在其基础上完成精细操作任务。这一设计也为第 4 章的感知--控制闭环任务奠定了通用移动底层。
+
 
 \section{Sim-to-Real 迁移与真机验证}
 
