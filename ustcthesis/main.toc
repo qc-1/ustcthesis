@@ -1,64 +1,67 @@
 \addvspace {12bp}
-\contentsline {chapter}{\numberline {第一章}绪论}{4}{chapter.1}%
-\contentsline {section}{\numberline {第一节}研究背景与意义}{4}{section.1.1}%
-\contentsline {section}{\numberline {第二节}国内外研究现状}{4}{section.1.2}%
-\contentsline {subsection}{\numberline {一}遥操作与数据采集}{4}{subsection.1.2.1}%
-\contentsline {subsection}{\numberline {二}通用全身运动控制}{5}{subsection.1.2.2}%
-\contentsline {subsection}{\numberline {三}感知--控制闭环与自主任务}{5}{subsection.1.2.3}%
-\contentsline {section}{\numberline {第三节}本文主要研究内容}{6}{section.1.3}%
-\contentsline {section}{\numberline {第四节}论文组织结构}{7}{section.1.4}%
+\contentsline {chapter}{\numberline {第一章}绪论}{5}{chapter.1}%
+\contentsline {section}{\numberline {第一节}研究背景与意义}{5}{section.1.1}%
+\contentsline {section}{\numberline {第二节}国内外研究现状}{5}{section.1.2}%
+\contentsline {subsection}{\numberline {一}遥操作与数据采集}{5}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {二}通用全身运动控制}{6}{subsection.1.2.2}%
+\contentsline {subsection}{\numberline {三}感知--控制闭环与自主任务}{6}{subsection.1.2.3}%
+\contentsline {section}{\numberline {第三节}本文主要研究内容}{7}{section.1.3}%
+\contentsline {section}{\numberline {第四节}论文组织结构}{8}{section.1.4}%
 \addvspace {12bp}
-\contentsline {chapter}{\numberline {第二章}多源全身运动数据采集与重定向}{8}{chapter.2}%
-\contentsline {section}{\numberline {第一节}系统架构概述}{8}{section.2.1}%
-\contentsline {section}{\numberline {第二节}多源人体运动捕捉系统}{9}{section.2.2}%
-\contentsline {subsection}{\numberline {一}惯性动捕系统}{9}{subsection.2.2.1}%
-\contentsline {subsection}{\numberline {二}光学动捕系统}{9}{subsection.2.2.2}%
-\contentsline {subsection}{\numberline {三}机器人-物体交互数据采集}{9}{subsection.2.2.3}%
-\contentsline {section}{\numberline {第三节}基于 GMR 的重定向}{11}{section.2.3}%
-\contentsline {subsection}{\numberline {一}GMR 算法介绍}{11}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {二}基于 GMR 的多源数据重定向实现}{11}{subsection.2.3.2}%
-\contentsline {subsection}{\numberline {三}多平台适配：G1 与 Taihu 全尺寸机器人}{12}{subsection.2.3.3}%
+\contentsline {chapter}{\numberline {第二章}多源全身运动数据采集与重定向}{9}{chapter.2}%
+\contentsline {section}{\numberline {第一节}系统架构概述}{9}{section.2.1}%
+\contentsline {section}{\numberline {第二节}多源人体运动捕捉系统}{10}{section.2.2}%
+\contentsline {subsection}{\numberline {一}惯性动捕系统}{10}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {二}光学动捕系统}{10}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {三}机器人-物体交互数据采集}{10}{subsection.2.2.3}%
+\contentsline {section}{\numberline {第三节}基于 GMR 的重定向}{12}{section.2.3}%
+\contentsline {subsection}{\numberline {一}GMR 算法介绍}{12}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {二}基于 GMR 的多源数据重定向实现}{12}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {三}多平台适配：G1 与 Taihu 全尺寸机器人}{13}{subsection.2.3.3}%
 \addvspace {12bp}
-\contentsline {chapter}{\numberline {第三章}解耦式通用全身运动控制策略}{14}{chapter.3}%
-\contentsline {section}{\numberline {第一节}上下肢解耦控制架构设计}{14}{section.3.1}%
-\contentsline {section}{\numberline {第二节}上肢遥操作}{15}{section.3.2}%
-\contentsline {subsection}{\numberline {一}系统组成与数据流}{15}{subsection.3.2.1}%
-\contentsline {subsection}{\numberline {二}基于 PICO 的双臂目标位姿获取}{16}{subsection.3.2.2}%
-\contentsline {subsection}{\numberline {三}双臂逆运动学求解方法}{17}{subsection.3.2.3}%
-\contentsline {subsection}{\numberline {四}Taihu 平台迁移与仿真验证}{18}{subsection.3.2.4}%
-\contentsline {section}{\numberline {第三节}下肢强化学习 Locomotion 策略}{19}{section.3.3}%
-\contentsline {subsection}{\numberline {一}任务建模与训练环境}{19}{subsection.3.3.1}%
-\contentsline {subsection}{\numberline {二}命令空间、观测空间与动作空间设计}{20}{subsection.3.3.2}%
-\contentsline {subsection}{\numberline {三}奖励函数与终止条件设计}{21}{subsection.3.3.3}%
-\contentsline {subsection}{\numberline {四}策略优化与训练配置}{22}{subsection.3.3.4}%
-\contentsline {subsection}{\numberline {五}多策略集成与 PICO 手柄切换}{23}{subsection.3.3.5}%
-\contentsline {section}{\numberline {第四节}Sim-to-Real 迁移与真机验证}{24}{section.3.4}%
+\contentsline {chapter}{\numberline {第三章}解耦式通用全身运动控制策略}{15}{chapter.3}%
+\contentsline {section}{\numberline {第一节}上下肢解耦控制架构设计}{15}{section.3.1}%
+\contentsline {section}{\numberline {第二节}上肢遥操作}{16}{section.3.2}%
+\contentsline {subsection}{\numberline {一}系统组成与数据流}{16}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {二}基于 PICO 的双臂目标位姿获取}{17}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {三}双臂逆运动学求解方法}{18}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {四}Taihu 平台迁移与仿真验证}{19}{subsection.3.2.4}%
+\contentsline {section}{\numberline {第三节}下肢强化学习 Locomotion 策略}{20}{section.3.3}%
+\contentsline {subsection}{\numberline {一}任务建模与训练环境}{20}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {二}命令输入、观测与动作设计}{21}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {三}奖励函数与终止条件设计}{22}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {四}策略优化与训练配置}{24}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {五}单一命令条件策略与训练效果}{24}{subsection.3.3.5}%
+\contentsline {section}{\numberline {第四节}系统集成与真机验证}{26}{section.3.4}%
+\contentsline {subsection}{\numberline {一}连续命令输入与 PICO 控制接口}{26}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {二}上下肢解耦融合与统一控制输出}{27}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {三}真机任务验证}{27}{subsection.3.4.3}%
 \addvspace {12bp}
-\contentsline {chapter}{\numberline {第四章}感知--控制闭环的自主任务执行}{25}{chapter.4}%
-\contentsline {section}{\numberline {第一节}感知--控制闭环架构概述}{25}{section.4.1}%
-\contentsline {section}{\numberline {第二节}动态球拍运动控制任务}{25}{section.4.2}%
-\contentsline {subsection}{\numberline {一}任务背景与系统架构}{25}{subsection.4.2.1}%
-\contentsline {subsection}{\numberline {二}视觉感知与轨迹预测接口}{26}{subsection.4.2.2}%
-\contentsline {subsection}{\numberline {三}全身运动生成与实验验证}{26}{subsection.4.2.3}%
-\contentsline {section}{\numberline {第三节}语音指令服务任务执行}{26}{section.4.3}%
-\contentsline {subsection}{\numberline {一}系统架构与任务流程}{26}{subsection.4.3.1}%
-\contentsline {subsection}{\numberline {二}任务规划与视觉感知}{27}{subsection.4.3.2}%
-\contentsline {subsection}{\numberline {三}全身控制集成与执行}{27}{subsection.4.3.3}%
-\contentsline {subsection}{\numberline {四}实验验证}{27}{subsection.4.3.4}%
-\contentsline {section}{\numberline {第四节}本章小结}{28}{section.4.4}%
+\contentsline {chapter}{\numberline {第四章}感知--控制闭环的自主任务执行}{29}{chapter.4}%
+\contentsline {section}{\numberline {第一节}感知--控制闭环架构概述}{29}{section.4.1}%
+\contentsline {section}{\numberline {第二节}动态球拍运动控制任务}{29}{section.4.2}%
+\contentsline {subsection}{\numberline {一}任务背景与系统架构}{29}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {二}视觉感知与轨迹预测接口}{30}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {三}全身运动生成与实验验证}{30}{subsection.4.2.3}%
+\contentsline {section}{\numberline {第三节}语音指令服务任务执行}{30}{section.4.3}%
+\contentsline {subsection}{\numberline {一}系统架构与任务流程}{30}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {二}任务规划与视觉感知}{31}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {三}全身控制集成与执行}{31}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {四}实验验证}{31}{subsection.4.3.4}%
+\contentsline {section}{\numberline {第四节}本章小结}{32}{section.4.4}%
 \addvspace {12bp}
-\contentsline {chapter}{\numberline {第五章}结论与展望}{29}{chapter.5}%
-\contentsline {section}{\numberline {第一节}本文工作总结}{29}{section.5.1}%
-\contentsline {section}{\numberline {第二节}主要创新点}{29}{section.5.2}%
-\contentsline {section}{\numberline {第三节}未来工作展望}{30}{section.5.3}%
+\contentsline {chapter}{\numberline {第五章}结论与展望}{33}{chapter.5}%
+\contentsline {section}{\numberline {第一节}本文工作总结}{33}{section.5.1}%
+\contentsline {section}{\numberline {第二节}主要创新点}{34}{section.5.2}%
+\contentsline {section}{\numberline {第三节}未来工作展望}{34}{section.5.3}%
 \addvspace {12bp}
-\contentsline {chapter}{参考文献}{31}{chapter*.16}%
-\contentsline {chapter}{\numberline {附录 A}硬件平台参数}{32}{appendix.A}%
-\contentsline {section}{\numberline {第一节}Unitree G1 机器人平台}{32}{section.A.1}%
-\contentsline {section}{\numberline {第二节}遥操作与感知设备}{32}{section.A.2}%
-\contentsline {chapter}{\numberline {附录 B}强化学习训练超参数}{33}{appendix.B}%
-\contentsline {section}{\numberline {第一节}PPO 训练配置}{33}{section.B.1}%
-\contentsline {section}{\numberline {第二节}网络结构与训练环境}{33}{section.B.2}%
-\contentsline {section}{\numberline {第三节}奖励、观测噪声与终止条件参数}{34}{section.B.3}%
-\contentsline {chapter}{致谢}{36}{appendix*.21}%
+\contentsline {chapter}{参考文献}{35}{chapter*.20}%
+\contentsline {chapter}{\numberline {附录 A}硬件平台参数}{36}{appendix.A}%
+\contentsline {section}{\numberline {第一节}Unitree G1 机器人平台}{36}{section.A.1}%
+\contentsline {section}{\numberline {第二节}遥操作与感知设备}{36}{section.A.2}%
+\contentsline {chapter}{\numberline {附录 B}强化学习训练超参数}{37}{appendix.B}%
+\contentsline {section}{\numberline {第一节}PPO 训练配置}{37}{section.B.1}%
+\contentsline {section}{\numberline {第二节}网络结构与训练环境}{37}{section.B.2}%
+\contentsline {section}{\numberline {第三节}奖励、观测噪声与终止条件参数}{38}{section.B.3}%
+\contentsline {chapter}{致谢}{40}{appendix*.25}%
 \contentsfinish 

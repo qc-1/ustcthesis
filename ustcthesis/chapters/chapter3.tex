@@ -173,29 +173,33 @@ J = w_p \lVert e_p \rVert^2 + w_r \lVert e_r \rVert^2 + w_q \lVert q \rVert^2 + 
 \section{下肢强化学习 Locomotion 策略}
 
 
-为使人形机器人在执行全身任务时具备稳定、可切换且可复用的基础移动能力，本文将下肢控制建模为基于强化学习的参考动作跟踪问题，并在 BeyondMimic 框架基础上完成训练与部署。与传统仅跟踪质心速度或足端接触相位的 locomotion 方法不同，本文更强调在保留自然步态结构的前提下，学习机器人对基座速度扰动、姿态偏差和接触变化的鲁棒响应。需要指出的是，本文在工程实现上并未训练单一全向移动策略，而是分别训练前进、后退、左移、右移和原地旋转五个基础策略，并通过 PICO 手柄输入完成在线切换，从而构成可用于全身控制系统的下肢技能库。
+为使人形机器人在执行全身任务时具备稳定、连续且可泛化的基础移动能力，本文将下肢控制建模为命令条件下的 locomotion 学习问题，并以 BeyondMimic 所体现的自然运动先验为启发，采用 motion prior 约束下的 imitation 与 reinforcement learning 混合训练框架。与仅依赖低维速度奖励的传统 locomotion 方法不同，本文强调在连续命令驱动下同时保留自然步态结构，使策略不仅能够响应基座速度、姿态偏差和接触变化，还能够在不同运动模式间实现较平滑的过渡。由此，下肢控制器不再被描述为若干离散技能的集合，而是被视为一个统一的 command-conditioned locomotion policy。
 
 
 \subsection{任务建模与训练环境}
 
-本文将下肢参考动作跟踪任务建模为马尔可夫决策过程
+本文将下肢命令条件 locomotion 任务建模为马尔可夫决策过程
 \begin{equation}
 \mathcal{M} = (\mathcal{S}, \mathcal{O}, \mathcal{A}, \mathcal{P}, r, \gamma),
 \end{equation}
-其中，$\mathcal{S}$ 表示机器人与仿真环境的真实状态空间，$\mathcal{O}$ 表示策略可观测空间，$\mathcal{A}$ 表示动作空间，$\mathcal{P}$ 表示环境状态转移，$r$ 为阶段奖励函数，$\gamma$ 为折扣因子。策略训练的目标是学习参数化策略 $\pi_{\theta}$，使其在参考动作驱动下最大化折扣累计回报：
+其中，$\mathcal{S}$ 表示机器人与仿真环境的真实状态空间，$\mathcal{O}$ 表示策略可观测空间，$\mathcal{A}$ 表示动作空间，$\mathcal{P}$ 表示环境状态转移，$r$ 为阶段奖励函数，$\gamma$ 为折扣因子。设连续运动命令为
+\begin{equation}
+c_t = \left[v_{x,t}^{\mathrm{cmd}},\ v_{y,t}^{\mathrm{cmd}},\ \omega_{z,t}^{\mathrm{cmd}}\right],
+\end{equation}
+其中，$v_{x,t}^{\mathrm{cmd}}$、$v_{y,t}^{\mathrm{cmd}}$ 和 $\omega_{z,t}^{\mathrm{cmd}}$ 分别表示期望前向速度、横向速度和偏航角速度。策略训练的目标是学习参数化策略 $\pi_{\theta}$，使其在命令约束下最大化折扣累计回报：
 \begin{equation}
 \max_{\theta} J(\pi_{\theta}) = \mathbb{E}_{\pi_{\theta}}\left[\sum_{t=0}^{T}\gamma^t r_t\right].
 \end{equation}
-在这里，机器人并不是从零开始学习抽象的“行走能力”，而是在参考运动序列的引导下学习如何对扰动和误差进行补偿，从而获得更稳定、更自然的步态跟踪能力。
+与纯命令跟踪策略不同，本文进一步引入来自参考动作数据集的 motion prior，用于约束步态自然性和模式过渡质量。换言之，机器人并不是从零开始学习抽象的“行走能力”，而是在参考动作先验的引导下学习如何在连续命令变化和外部扰动下生成稳定、自然的 locomotion 行为。
 
 从训练环境组织方式看，本文采用 Isaac Lab 的 manager-based 强化学习框架来承载这一 MDP。
-环境以平地为基础场景，通过并行仿真同时采样大量机器人实例，并在重置阶段注入根部位置、姿态、速度、接触和动力学参数扰动。
+环境以平地为基础场景，通过并行仿真同时采样大量机器人实例，并在重置阶段注入根部位置、姿态、速度、接触和动力学参数扰动。训练过程中，高层命令在给定范围内随机采样，而参考动作数据则以 motion prior 的形式提供步态结构约束和 imitation 监督信号。
 训练对象为 Unitree G1 的全身模型，下肢承担主要 locomotion 功能，
 隐式 PD 执行器负责将策略输出的关节参考量转换为底层稳定驱动。
 具体的 PPO 超参数、并行环境规模、仿真时间步长、执行器参数以及动作缩放配置不再在此展开，
 统一整理于附录表~\ref{tab:ppo-hparams} 与表~\ref{tab:rl-env-config}。
 
-为更清晰展示该策略的训练逻辑，本文将 BeyondMimic 下肢策略的训练流程概括为“参考动作采样--环境扰动--观测构造--PPO 优化--奖励回传”的闭环结构，如图~\ref{fig:locomotion_training_pipeline} 所示。
+为更清晰展示该策略的训练逻辑，本文将单一命令条件下肢策略的训练流程概括为“命令采样--motion prior 监督--环境交互--PPO 优化--奖励回传”的闭环结构，如图~\ref{fig:locomotion_training_pipeline} 所示。
 
 \begin{figure}[htbp]
     \centering
@@ -212,13 +216,13 @@ J = w_p \lVert e_p \rVert^2 + w_r \lVert e_r \rVert^2 + w_q \lVert q \rVert^2 + 
         dashedarrow/.style={->, thick, dashed, draw=purple!80!black}
     ]
 
-    \node[data] (motion) {参考动作数据集\\ \footnotesize motion clips};
-    \node[env, right=of motion] (command) {参考动作采样与扰动\\ \footnotesize 根部位姿/速度随机化};
+    \node[data] (motion) {参考动作数据集\\ \footnotesize motion prior / demonstrations};
+    \node[env, right=of motion] (command) {连续命令采样与扰动\\ \footnotesize $v_x,v_y,\omega_z$ + 状态随机化};
     \node[env, right=of command] (sim) {Isaac Lab 并行环境\\ \footnotesize 物理仿真 + 执行器模型};
 
-    \node[rl, below=1.4cm of command] (obs) {观测构造\\ \footnotesize policy / critic observations};
-    \node[rl, right=of obs] (ppo) {PPO 策略优化器\\ \footnotesize Actor-Critic + RSL-RL};
-    \node[reward, right=of ppo] (rew) {奖励与终止判定\\ \footnotesize tracking / penalty / reset};
+    \node[rl, below=1.4cm of command] (obs) {观测构造\\ \footnotesize proprioception + command + prior};
+    \node[rl, right=of obs] (ppo) {混合训练优化\\ \footnotesize imitation branch + PPO};
+    \node[reward, right=of ppo] (rew) {奖励与终止判定\\ \footnotesize command tracking / stability / reset};
 
     \draw[arrow] (motion) -- (command);
     \draw[arrow] (command) -- (sim);
@@ -230,34 +234,34 @@ J = w_p \lVert e_p \rVert^2 + w_r \lVert e_r \rVert^2 + w_q \lVert q \rVert^2 + 
     \draw[dashedarrow] (rew.west) -- ++(-1.0,0) |- (command.south) node[pos=0.2, below] {难例重采样/重置};
 
     \node[draw=black!25, dashed, inner sep=0.35cm, fit=(command)(sim)(obs)(ppo)(rew),
-      label={[text=black!60]above:下肢强化学习训练闭环}] {};
+      label={[text=black!60]above:命令条件下肢策略训练闭环}] {};
     \end{tikzpicture}
-    \caption{下肢 Locomotion 策略训练流程图}
+    \caption{单一命令条件下肢策略训练流程图}
     \label{fig:locomotion_training_pipeline}
 \end{figure}
 
 
-\subsection{命令空间、观测空间与动作空间设计}
+\subsection{命令输入、观测与动作设计}
 
-在命令空间设计上，本文并不是直接向策略输入一个低维速度指令，而是通过 \texttt{MotionCommand} 模块从参考动作数据集中读取某一时刻的关节状态与关键刚体运动信息，并将其记为参考命令 $c_t$。在具体实现中，参考命令由关节位置、关节速度以及锚点和关键刚体的位姿与速度信息组成。为增强策略对时序变化和扰动的适应能力，训练阶段会在参考动作采样后进一步叠加根部位姿与速度随机化，使策略学习的不是对单一轨迹的机械记忆，而是围绕参考动作进行稳定补偿的能力。
+在命令条件设计上，本文直接向策略提供低维连续运动命令 $c_t$，用于刻画当前期望的基座运动意图。同时，为避免策略仅依据速度奖励学习出缺乏自然性的步态，本文引入来自参考动作数据集的 motion prior 条件 $h_t^{\mathrm{prior}}$，其作用不是强制机器人逐帧复现某一条轨迹，而是为策略提供关于步态相位、姿态变化趋势和局部运动风格的先验约束。由此，策略在训练时既接收连续命令，又保留来自示教数据的自然运动偏好。
 
-对 actor 而言，本文将策略观测写为
+在本文记号下，actor 的输入可记为
 \begin{equation}
-o_t = \left[c_t,\ e^{\text{anchor}}_t,\ v^{\text{base}}_t,\ \omega^{\text{base}}_t,\ q_t-q_0,\ \dot{q}_t,\ a_{t-1}\right],
+o_t = \left[c_t,\ h_t^{\mathrm{prior}},\ v^{\text{base}}_t,\ \omega^{\text{base}}_t,\ q_t-q_0,\ \dot{q}_t,\ a_{t-1}\right],
 \end{equation}
-其中，$e^{\text{anchor}}_t$ 表示参考锚点相对机器人基座的位姿误差，$v^{\text{base}}_t$ 与 $\omega^{\text{base}}_t$ 分别表示机身线速度和角速度，$q_t-q_0$ 为相对默认姿态的关节偏移，$a_{t-1}$ 为上一时刻动作。该观测设计使策略在每个时刻同时感知参考目标、当前机身运动状态和历史控制趋势。为提升 sim-to-real 鲁棒性，训练过程中还在这些观测量上叠加均匀噪声，其具体范围统一列于附录表~\ref{tab:rl-reward-noise-termination}。
+其中，$h_t^{\mathrm{prior}}$ 表示由参考动作先验提取的步态上下文特征，$v^{\text{base}}_t$ 与 $\omega^{\text{base}}_t$ 分别表示机身线速度和角速度，$q_t-q_0$ 为相对默认姿态的关节偏移，$a_{t-1}$ 为上一时刻动作。该观测设计使策略在每个时刻同时感知连续控制命令、当前机身运动状态、历史控制趋势以及自然步态先验。为提升 sim-to-real 鲁棒性，训练过程中还在这些观测量上叠加均匀噪声，其具体范围统一列于附录表~\ref{tab:rl-reward-noise-termination}。
 
-对于 critic，本文采用非对称 actor-critic 结构，在训练阶段向值函数网络额外提供关键刚体相对锚点的真实位置与姿态等特权信息，从而得到更稳定的值函数估计。记 critic 输入为
+对于 critic，本文采用非对称 actor-critic 结构，在训练阶段向值函数网络额外提供关键刚体相对躯干的真实位置与姿态等特权信息，从而得到更稳定的值函数估计。在本文记号下，critic 的输入可进一步写为
 \begin{equation}
 \tilde{o}_t = \left[o_t,\ p^{\text{body}}_t,\ R^{\text{body}}_t\right].
 \end{equation}
-这一设计兼顾了部署阶段的部分可观测约束与训练阶段的估计精度需求。
+其中，$p^{\text{body}}_t$ 表示各关键刚体相对躯干锚点的真实位置量，$R^{\text{body}}_t$ 表示对应相对姿态的 Rot6D 编码。相较于欧拉角表示中的周期性跳变以及四元数表示中的双覆盖歧义，Rot6D 通过旋转矩阵前两列构造连续的姿态编码，使相近姿态在特征空间中仍保持相近表示，从而改善了策略网络回归过程中的损失平滑性与优化稳定性。该设计兼顾了部署阶段的部分可观测约束与训练阶段的估计精度需求。
 
-动作空间方面，策略输出被定义为
+在动作设计方面，策略输出及其到关节参考量的映射可概括为
 \begin{equation}
 a_t = \pi_{\theta}(o_t),
 \end{equation}
-并进一步映射为关节位置参考量
+并进一步写为关节位置参考量
 \begin{equation}
 q_t^{\text{sp}} = q_0 + \alpha \odot a_t,
 \end{equation}
@@ -266,51 +270,63 @@ q_t^{\text{sp}} = q_0 + \alpha \odot a_t,
 
 \subsection{奖励函数与终止条件设计}
 
-奖励函数设计是本文下肢 motion tracking 训练的核心。设机器人躯干为锚点刚体 $a$，关键刚体集合为 $\mathcal{B}$，则相对位置、姿态、线速度和角速度误差可分别写为
+奖励函数设计是本文单一命令条件下肢策略训练的核心。为使机器人既能准确响应连续命令，又能保持自然、稳定的步态结构，本文将阶段奖励划分为命令跟踪项、稳定性项、先验一致性项和正则惩罚项。首先，平面速度与偏航角速度的命令跟踪误差可写为
 \begin{equation}
-\bar{e}_{p} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}}
-\left\| \left(p_{i,t}^{\text{ref}} - p_{a,t}^{\text{ref}}\right) - \left(p_{i,t} - p_{a,t}\right) \right\|_2^2,
+\bar{e}_{v} = \left\|
+\begin{bmatrix}
+v_{x,t} \\
+v_{y,t}
+\end{bmatrix}
+-
+\begin{bmatrix}
+v_{x,t}^{\mathrm{cmd}} \\
+v_{y,t}^{\mathrm{cmd}}
+\end{bmatrix}
+\right\|_2^2,\qquad
+\bar{e}_{\omega} = \left| \omega_{z,t} - \omega_{z,t}^{\mathrm{cmd}} \right|^2,
 \end{equation}
+其中，$v_{x,t}$、$v_{y,t}$ 和 $\omega_{z,t}$ 分别表示机器人当前时刻的前向速度、横向速度与偏航角速度。为约束机身稳定性，进一步定义躯干高度与姿态偏差：
 \begin{equation}
-\bar{e}_{R} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} d\!\left(R_{i,t}^{\text{ref}}, R_{i,t}\right)^2,
+\bar{e}_{h} = \left| h_t - h_0 \right|^2,\qquad
+\bar{e}_{R} = d\!\left(R_t^{\mathrm{torso}}, R_0^{\mathrm{torso}}\right)^2,
 \end{equation}
+其中，$h_t$ 表示当前躯干高度，$h_0$ 表示名义站立高度，$R_t^{\mathrm{torso}}$ 与 $R_0^{\mathrm{torso}}$ 分别表示当前和名义躯干姿态，$d(\cdot,\cdot)$ 表示姿态距离。另一方面，为保留参考动作数据中的自然步态结构，本文引入 imitation / motion prior 一致性误差
 \begin{equation}
-\bar{e}_{v} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} \left\| v_{i,t}^{\text{ref}} - v_{i,t} \right\|_2^2,\qquad
-\bar{e}_{\omega} = \frac{1}{|\mathcal{B}|} \sum_{i\in\mathcal{B}} \left\| \omega_{i,t}^{\text{ref}} - \omega_{i,t} \right\|_2^2,
+\bar{e}_{\mathrm{im}} = \left\| a_t - a_t^{\mathrm{prior}} \right\|_2^2,
 \end{equation}
-其中，$d(\cdot,\cdot)$ 表示姿态距离。与 BeyondMimic 中的实现一致，本文使用指数型奖励塑形将误差映射为有界正奖励：
+其中，$a_t^{\mathrm{prior}}$ 表示由 motion prior 或示教轨迹给出的参考动作。为保持各奖励项尺度一致，本文使用指数型塑形函数将上述误差映射为有界正奖励：
 \begin{equation}
-r_s = \exp\!\left(-\frac{\bar{e}_s}{\sigma_s^2}\right), \qquad s\in\{p,R,v,\omega\}.
+r_s = \exp\!\left(-\frac{\bar{e}_s}{\sigma_s^2}\right), \qquad s\in\{v,\omega,h,R,\mathrm{im}\}.
 \end{equation}
-除关键刚体的相对误差外，本文还对锚点在世界坐标系下的位置和姿态误差设置全局跟踪项，以约束机身整体的稳定性和方向一致性。
+其中，$\sigma_s$ 为对应奖励项的尺度参数，用于控制误差到奖励衰减的敏感程度。
 
 综合各项正向奖励与正则项后，阶段奖励可写为
 \begin{equation}
 \begin{aligned}
-r_t =\;& w_{a,p} r_{a,p} + w_{a,R} r_{a,R} + w_p r_p + w_R r_R + w_v r_v + w_{\omega} r_{\omega} \\
+r_t =\;& w_v r_v + w_{\omega} r_{\omega} + w_h r_h + w_R r_R + w_{\mathrm{im}} r_{\mathrm{im}} \\
 &- \lambda_u \left\| a_t - a_{t-1} \right\|_2^2 - \lambda_l r_{\text{limit}} - \lambda_c r_{\text{contact}},
 \end{aligned}
 \end{equation}
-其中，$r_{a,p}$ 和 $r_{a,R}$ 分别表示锚点位置与姿态跟踪奖励，$r_{\text{limit}}$ 表示关节越限惩罚，$r_{\text{contact}}$ 表示非期望接触惩罚。上述设计对应了“全局姿态--局部结构--动态一致性--物理可行性”的四层训练目标。各奖励项的具体权重、$\sigma$ 参数及接触阈值整理于附录表~\ref{tab:rl-reward-noise-termination}。
+其中，$r_t$ 为时刻 $t$ 的阶段奖励，$r_v$ 和 $r_{\omega}$ 分别表示线速度与偏航角速度命令跟踪奖励，$r_h$ 与 $r_R$ 表示机身高度和姿态稳定性奖励，$r_{\mathrm{im}}$ 表示与 motion prior 保持一致的 imitation 奖励；$w_v$、$w_{\omega}$、$w_h$、$w_R$ 和 $w_{\mathrm{im}}$ 为各正向奖励项的权重；$a_t$ 和 $a_{t-1}$ 分别为当前时刻与上一时刻的策略动作；$\lambda_u$、$\lambda_l$ 和 $\lambda_c$ 为动作平滑项、关节越限项和非期望接触项的惩罚系数；$r_{\text{limit}}$ 表示关节越限惩罚，$r_{\text{contact}}$ 表示非期望接触惩罚。上述设计对应了“命令响应--姿态稳定--运动自然性--物理可行性”的四层训练目标。各奖励项的具体设计项、观测噪声范围及终止阈值整理于附录表~\ref{tab:rl-reward-noise-termination}。
 
-终止条件同样围绕跟踪失效和机身失稳进行设计。若锚点高度偏差、锚点姿态偏差或关键末端刚体高度偏差超过阈值，则提前结束当前回合。其逻辑可概括为
+终止条件同样围绕机身失稳和命令执行失效进行设计。若躯干高度偏差、躯干姿态偏差或非期望碰撞超过阈值，则提前结束当前回合。其逻辑可概括为
 \begin{equation}
 d_t = \mathbb{I}\!\left(
-\left| z_{a,t}^{\text{ref}} - z_{a,t} \right| > \delta_z
+\left| h_t - h_0 \right| > \delta_h
 \;\vee\;
-d\!\left(R_{a,t}^{\text{ref}}, R_{a,t}\right) > \delta_R
+d\!\left(R_t^{\mathrm{torso}}, R_0^{\mathrm{torso}}\right) > \delta_R
 \;\vee\;
-\max_{j\in\mathcal{E}} \left| z_{j,t}^{\text{ref}} - z_{j,t} \right| > \delta_e
+r_{\text{contact}} > \delta_c
 \right),
 \end{equation}
-其中，$\mathcal{E}$ 表示踝部和腕部等关键末端集合。这样的提前终止机制能够避免策略在严重跌倒状态中浪费采样步数，并将训练重点集中到可恢复、可学习的误差区域。
+其中，$\mathbb{I}(\cdot)$ 为示性函数，当括号内任一条件成立时取值为 $1$，表示当前回合终止；$\delta_h$、$\delta_R$ 和 $\delta_c$ 分别表示躯干高度阈值、躯干姿态阈值和非期望接触阈值。这样的提前终止机制能够避免策略在严重跌倒状态中浪费采样步数，并将训练重点集中到可恢复、可学习的命令响应区域。
 
-此外，为提高困难样本利用效率，本文保留了 motion bin 的自适应采样机制。系统根据最近训练中各时间片段的失败频率调整重置时的采样概率，使策略在保持均匀覆盖的同时，更关注转身、侧移等高难度动作区间。
+此外，为提高训练覆盖度，本文在连续命令空间上采用分段采样与课程式扩展策略：训练初期优先覆盖低速、小转角命令，随后逐步扩展到更大范围的前进、后退、横移和转向命令，从而提高单一策略在完整命令空间中的收敛稳定性。
 
 
 \subsection{策略优化与训练配置}
 
-在策略优化算法上，本文采用 PPO 对策略网络和价值网络进行联合训练。其核心裁剪目标可写为
+在策略优化算法上，本文采用 imitation 与 PPO 结合的混合训练框架。对于强化学习部分，仍使用 PPO 对策略网络和价值网络进行联合优化，其核心裁剪目标可写为
 \begin{equation}
 L^{\text{clip}}(\theta) =
 \mathbb{E}_t\left[
@@ -324,33 +340,105 @@ L^{\text{clip}}(\theta) =
 \begin{equation}
 \rho_t(\theta) = \frac{\pi_{\theta}(a_t|o_t)}{\pi_{\theta_{\text{old}}}(a_t|o_t)},
 \end{equation}
-$\hat{A}_t$ 为优势估计。训练时，PPO 还联合价值函数损失和熵正则项进行更新，从而在策略改进、值函数拟合和探索能力之间取得平衡。由于本文采用非对称 actor-critic 结构，actor 仅依赖可部署观测，而 critic 在训练阶段使用特权观测，这种设置能够在不增加部署复杂度的前提下提高训练稳定性。
-
-从正文写作角度看，PPO 的学习率、批大小、epoch 数、clip 系数、熵正则、KL 约束，以及并行环境数、控制周期、网络层数等具体配置均属于可复现参数，而非本章方法学核心，因此统一整理在附录表~\ref{tab:ppo-hparams} 和表~\ref{tab:rl-env-config} 中。这样既能保持正文对建模与优化逻辑的突出，也便于后续实验复现。
-
-\subsection{多策略集成与 PICO 手柄切换}
-
-除单个策略的训练外，本文在系统部署层面进一步采用了“多策略技能库”的思路，而不是将所有移动模式压缩为单一全向策略。具体而言，本文基于 BeyondMimic 分别训练了五个基础下肢策略，记为
+$\hat{A}_t$ 为优势估计。为保留 motion prior 所蕴含的自然步态结构，本文进一步引入 imitation 损失
 \begin{equation}
-\Pi = \left\{ \pi_{\mathrm{fwd}},\ \pi_{\mathrm{bwd}},\ \pi_{\mathrm{left}},\ \pi_{\mathrm{right}},\ \pi_{\mathrm{yaw}} \right\},
+L_{\mathrm{im}} = \mathbb{E}_t \left[\left\| a_t - a_t^{\mathrm{prior}} \right\|_2^2\right],
 \end{equation}
-分别对应前进行走、后退行走、左向平移、右向平移和原地旋转五类基础 locomotion 模式。
-
-采用多策略而非单一统一策略的主要原因在于：不同移动模式对应的参考动作分布、支撑相位切换和机身姿态调节规律存在明显差异，若将其全部纳入单一策略，动作分布会显著增宽，训练收敛和部署稳定性都会受到影响。将基础移动能力拆分为多个专用策略后，每个策略都可以在更聚焦的命令空间内完成训练，从而提高各模式下的稳定性、动作质量和可控性。
-
-在在线执行阶段，PICO 手柄输入不再直接映射为连续全向速度，而是作为高层模式切换信号。设手柄输入为 $u_t$，模式选择器为 $\mathcal{S}(\cdot)$，则在线控制逻辑可写为
+并将整体训练目标写为
 \begin{equation}
-m_t = \mathcal{S}(u_t), \qquad a_t = \pi_{m_t}(o_t),
+L_{\mathrm{total}} = L_{\mathrm{RL}} + \lambda_{\mathrm{im}} L_{\mathrm{im}},
 \end{equation}
-其中，$m_t$ 表示当前选中的 locomotion 模式，$\pi_{m_t}$ 表示与该模式对应的策略网络。也就是说，PICO 手柄承担的是高层意图选择功能，而具体的下肢动作生成仍由当前被选中的强化学习策略完成。通过这种方式，本文实现了基于手柄输入的前进、后退、横移和原地转向切换，使下肢系统能够在遥操作任务中提供可预测、可复用且易于上层调用的基础机动能力。
+其中，$L_{\mathrm{RL}}$ 表示由 PPO 裁剪目标、价值函数损失与熵正则共同构成的强化学习优化项，$\lambda_{\mathrm{im}}$ 为 imitation 分支权重。该写法刻画的是一种典型的混合训练思路：一方面利用 imitation / motion prior 约束策略保持自然运动风格，另一方面通过 PPO 提升其在扰动、接触不确定性和连续命令变化下的鲁棒性。由于本文采用非对称 actor-critic 结构，actor 仅依赖可部署观测，而 critic 在训练阶段使用特权观测，这种设置能够在不增加部署复杂度的前提下提高训练稳定性。
 
-综合来看，本文的下肢 locomotion 模块并不是单纯以“速度跟踪”为目标的传统行走控制器，而是一个融合参考动作跟踪、域随机化、自适应采样、PPO 优化以及多策略在线切换的基础运动控制体系。它在体系结构上与上肢遥操作模块天然解耦：下肢负责生成稳定的全身支撑与基座移动能力，上肢则在其基础上完成精细操作任务。这一设计也为第 4 章的感知--控制闭环任务奠定了通用移动底层。
+PPO 的学习率、批大小、epoch 数、clip 系数、熵正则、KL 约束，以及并行环境数、控制周期、网络层数等具体配置统一整理在附录表~\ref{tab:ppo-hparams} 
+和表~\ref{tab:rl-env-config} 中。
+
+\subsection{单一命令条件策略与训练效果}
+
+在单一命令条件策略的设定下，前进、后退、横移与转向不再被视为彼此独立的控制器，而是被统一纳入同一策略在不同命令条件下的输出分布中。换言之，本文希望学习的是一个连续命令驱动的 locomotion 生成器：当命令 $c_t$ 变化时，策略能够自动在前进、后退、侧移与原地转向等动作模式之间调整输出，而不是依赖显式的离散模式切换。
+
+在本文记号下，该单一策略的动作生成过程可概括为
+\begin{equation}
+a_t = \pi_{\theta}(o_t, c_t, h_t^{\mathrm{prior}}),
+\end{equation}
+其中，$c_t$ 表示连续运动命令，$h_t^{\mathrm{prior}}$ 表示 motion prior 条件。该表达强调：不同 locomotion 模式的形成来源于连续命令与运动先验的共同作用，而不是由独立策略的显式切换触发。由此，策略在小命令变化下也能给出相邻的动作响应，有利于实现更平滑的速度调节与模式过渡。
+
+从训练效果的角度看，单一命令条件策略的优势在于：其一，连续命令空间内的不同运动模式共享同一套网络参数，有利于在前进、后退、横移和转向之间形成统一的动力学表征；其二，motion prior 与 imitation 约束为策略提供了自然步态偏好，使其在命令变化时仍能保持较好的人形运动风格；其三，命令空间中的中间状态不再需要依赖手工划分的模式边界，而能够通过同一策略自然生成速度过渡与姿态调整行为。
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][0.16\textheight][c]{0.88\textwidth}{\centering
+    训练曲线图预留位置\\
+    可用于展示单一命令条件策略在命令空间扩展过程中的奖励收敛、跟踪误差下降和稳定性结果}}
+    \caption{单一命令条件策略训练曲线预留图位}
+    \label{fig:single-policy-training-placeholder}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][0.16\textheight][c]{0.88\textwidth}{\centering
+    仿真效果图预留位置\\
+    可用于展示单一策略在不同连续命令下实现前进、后退、横移和转向的仿真运动快照}}
+    \caption{单一命令条件策略仿真效果预留图位}
+    \label{fig:single-policy-sim-placeholder}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][0.16\textheight][c]{0.88\textwidth}{\centering
+    真机 locomotion 效果图预留位置\\
+    可用于展示单一策略在真实机器人平台上对不同连续命令的执行效果}}
+    \caption{单一命令条件策略真机效果预留图位}
+    \label{fig:single-policy-real-placeholder}
+\end{figure}
+
+综合来看，本文的下肢 locomotion 模块并不是单纯以“速度跟踪”为目标的传统行走控制器，而是一个融合连续命令输入、motion prior、imitation 约束与 PPO 优化的统一基础运动控制器。它在体系结构上与上肢遥操作模块天然解耦：下肢负责生成稳定的全身支撑与基座移动能力，上肢则在其基础上完成精细操作任务。关于命令输入的在线映射方式与整机集成机制，将在下一节进一步讨论。
 
 
-\section{Sim-to-Real 迁移与真机验证}
+\section{系统集成与真机验证}
 
-仿真训练获得的控制策略能否平稳部署到真实机器人，是评价系统工程价值的重要标准。为减小仿真与真实系统之间的差异，本文在控制部署阶段结合动力学参数辨识、执行器响应适配、传感器标定和控制频率对齐等手段，对策略输入输出接口进行统一修正。同时，通过在训练阶段引入域随机化，使策略提前适应一定范围内的模型偏差和环境变化。
+本节进一步从系统实现角度讨论解耦式全身控制策略的部署方式。与上一节聚焦单一命令条件策略的训练不同，本节重点回答两个问题：其一，连续运动命令如何由 PICO 输入映射为下肢控制接口；其二，上肢遥操作输出与下肢移动控制输出如何在整机层面融合，并最终支撑真实任务执行。
 
-在真机验证方面，本文计划围绕四类基础 locomotion 模式展开实验，包括前进、后退、原地旋转和左右平移，并考察不同速度指令下的稳定性、跟踪误差和能耗情况。对于上肢部分，则重点验证遥操作轨迹跟踪精度以及与下肢运动同时执行时的协调表现。对于尚未完成的统计结果，本文保留速度跟踪误差、关节力矩分布和单位任务能耗等指标占位，以待后续实验补齐。
+\subsection{连续命令输入与 PICO 控制接口}
 
-总体而言，解耦式控制策略将遥操作、强化学习和任务接口三者连接起来，使本文的方法既能支撑基础移动技能，又能支持上层感知与规划模块的接入。这为第 4 章的任务级闭环验证奠定了基础。
+在系统部署阶段，PICO 在下肢部分不再承担“模式切换器”的角色，而是作为连续运动命令输入设备。操作者通过摇杆或手柄状态提供期望的前向速度、横向速度与偏航角速度，系统将其映射为下肢策略的连续命令输入。若记 PICO 控制输入为 $u_t$，命令映射函数为 $\mathcal{M}(\cdot)$，则在线控制逻辑可写为
+\begin{equation}
+c_t = \mathcal{M}(u_t), \qquad a_t = \pi_{\theta}(o_t, c_t, h_t^{\mathrm{prior}}),
+\end{equation}
+其中，$c_t$ 表示连续 locomotion 命令，$\mathcal{M}(\cdot)$ 表示从人机输入到命令空间的映射关系。该结构将“人机交互意图解析”与“低层 locomotion 动作生成”分离开来，使操作员能够通过连续命令而非离散模式调用机器人移动能力。
+
+从工程实现角度看，这种命令输入方式具有三点优势。首先，PICO 输入与策略命令空间之间建立了直接对应关系，避免了离散模式切换导致的边界不连续问题。其次，单一策略能够在连续命令变化下自然产生速度调节和模式过渡，从而提升人机交互的流畅性。最后，下肢控制接口被统一为命令驱动形式，更便于与上层任务规划、共享控制和自主导航模块对接。
+
+\subsection{上下肢解耦融合与统一控制输出}
+
+在整机控制层，上肢与下肢模块采用“分子空间生成、统一接口下发”的融合方式。其思想与 Psi0 的部署逻辑一致：首先由单一命令条件下肢策略在给定 $c_t$ 的条件下给出与基座移动和支撑调节相关的候选关节命令；随后再利用上肢遥操作与逆运动学结果，对全身命令中的上肢关节片段进行覆盖，从而形成最终的整机控制输出。这样做的核心不在于简单地将两组控制量并列堆叠，而在于通过关节子空间划分，使下肢策略持续负责动态稳定与移动能力，而上肢模块专注于双臂操作任务。
+
+若记下肢策略首先生成的候选全身命令为 $(\bar{q}_t^{\mathrm{wb}}, \bar{\tau}_t^{\mathrm{wb}})$，上肢逆运动学模块输出的双臂命令为 $(q_t^{\mathrm{arm}}, \tau_t^{\mathrm{arm}})$，并以 $\mathcal{J}_{\mathrm{leg}}$ 和 $\mathcal{J}_{\mathrm{arm}}$ 分别表示下肢与上肢关节索引集合，则最终整机控制命令可写为
+\begin{equation}
+q_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{leg}}] = \bar{q}_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{leg}}], \qquad
+q_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{arm}}] = q_t^{\mathrm{arm}},
+\end{equation}
+\begin{equation}
+\tau_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{leg}}] = \bar{\tau}_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{leg}}], \qquad
+\tau_t^{\mathrm{wb}}[\mathcal{J}_{\mathrm{arm}}] = \tau_t^{\mathrm{arm}}.
+\end{equation}
+其中，$q_t^{\mathrm{wb}}$ 和 $\tau_t^{\mathrm{wb}}$ 分别表示全身关节目标位置与全身前馈力矩，$\bar{q}_t^{\mathrm{wb}}$ 和 $\bar{\tau}_t^{\mathrm{wb}}$ 表示命令条件下肢策略给出的候选全身命令。上述写法所表达的正是“下肢保留下肢子空间输出，上肢覆盖上肢子空间输出”的控制融合机制，它与 Psi0 中先由下肢策略产生候选命令、再将双臂控制结果覆盖到上肢关节片段的实现思路一致。
+
+这种上下肢解耦融合方式的优点在于：一方面，下肢策略无需显式建模复杂的双臂操作意图，从而能够保持步态稳定性与移动鲁棒性；另一方面，上肢遥操作也无需直接关心整机重心调节和落足策略，而只需专注于双臂目标位姿生成。因而，整机系统既保留了强化学习策略在动态稳定方面的优势，也保留了遥操作在精细操作和任务泛化方面的灵活性。
+
+\subsection{真机任务验证}
+
+为验证所提出系统在真实场景中的可用性，本文将真机实验从单纯的 locomotion 指标测试扩展到移动操作任务验证。实验中，操作者通过 PICO 设备同时完成基座机动与双臂遥操作，使机器人在真实环境中执行具有代表性的搬运与整理任务。例如，机器人需要先接近目标物体，再通过双臂抓取水瓶并将其放入指定盒中；在另一项任务中，机器人需要将放置于桌面的书包抓起，并转移至相邻桌面完成重新放置。此类任务同时涉及基座相对定位、双臂姿态协调、抓取稳定性和放置精度，因此能够较全面地检验系统的整体性能。
+
+从验证指标上看，真机任务实验重点关注以下几个方面：其一，机器人在执行移动操作任务时能否保持基座运动稳定，避免在横移、转向或接近目标物体过程中发生明显失稳；其二，上下肢模块能否在控制时序上实现协调，即下肢持续提供稳定支撑，而上肢完成目标抓取与释放动作；其三，整套人机交互系统是否具备足够的实时性与可控性，使操作者能够在任务过程中连续修正动作而不引入明显迟滞。
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][0.18\textheight][c]{0.88\textwidth}{\centering
+    真机任务验证图预留位置\\
+    可用于展示水瓶抓取放置、书包搬运等任务的操作序列图或关键帧结果}}
+    \caption{系统真机任务验证预留图位}
+    \label{fig:whole-body-task-placeholder}
+\end{figure}
+
+总体而言，本节所述的系统集成过程将“连续命令输入”“上下肢控制融合”和“任务级真机执行”三者贯通起来，使本文提出的解耦式控制框架不仅能够支撑基础 locomotion 能力训练，还能够进一步服务于具有实际操作意义的移动操作任务。

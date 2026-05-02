@@ -1,5 +1,9 @@
-\contentsline {figure}{\numberline {2.1}{\ignorespaces 多源动捕数据到机器人平台的 GMR 重定向框架示意图}}{8}{figure.caption.11}%
-\contentsline {figure}{\numberline {3.1}{\ignorespaces 解耦式通用全身运动控制架构图}}{15}{figure.caption.12}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces PICO 遥操作输入与位姿获取通信数据流图}}{17}{figure.caption.13}%
-\contentsline {figure}{\numberline {3.3}{\ignorespaces 下肢 Locomotion 策略训练流程图}}{20}{figure.caption.15}%
+\contentsline {figure}{\numberline {2.1}{\ignorespaces 多源动捕数据到机器人平台的 GMR 重定向框架示意图}}{9}{figure.caption.11}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces 解耦式通用全身运动控制架构图}}{16}{figure.caption.12}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces PICO 遥操作输入与位姿获取通信数据流图}}{18}{figure.caption.13}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces 单一命令条件下肢策略训练流程图}}{21}{figure.caption.15}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces 单一命令条件策略训练曲线预留图位}}{25}{figure.caption.16}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces 单一命令条件策略仿真效果预留图位}}{25}{figure.caption.17}%
+\contentsline {figure}{\numberline {3.6}{\ignorespaces 单一命令条件策略真机效果预留图位}}{26}{figure.caption.18}%
+\contentsline {figure}{\numberline {3.7}{\ignorespaces 系统真机任务验证预留图位}}{28}{figure.caption.19}%
 \contentsfinish 
